@@ -83,12 +83,15 @@ Module.register('MMM-Face-Reco-DNN', {
     mjpgStreamerUrl: "http://localhost:8081/?action=stream",
     mjpgStreamerUser: "",
     mjpgStreamerPassword: "",
+    // Minimum time interval between voice messages in milliseconds (default: 2 minutes)
+    voiceMessageInterval: 120000,
   },
 
   timouts: {},
   users: [],
   userClasses: [],
   image: '',
+  lastVoiceMessageTime: {},
 
   // ----------------------------------------------------------------------------------------------------
   start: function () {
@@ -217,8 +220,16 @@ Module.register('MMM-Face-Reco-DNN', {
         title: this.translate('title'),
       });
 
-      // Send voice message to TTS module
-      this.sendNotification('MMM-Text-To-Speech', welcomeMessage);
+      // Send voice message to TTS module only if enough time has passed for this specific user
+      var currentTime = Date.now();
+      var lastMessageTime = this.lastVoiceMessageTime[name] || 0;
+      if (currentTime - lastMessageTime >= this.config.voiceMessageInterval) {
+        this.sendNotification('MMM-Text-To-Speech', welcomeMessage);
+        this.lastVoiceMessageTime[name] = currentTime;
+        this.config.debug && Log.log('Voice message sent for user: ' + name);
+      } else {
+        this.config.debug && Log.log('Voice message skipped for user: ' + name + ' (too soon since last message)');
+      }
     }
   },
 
@@ -235,6 +246,9 @@ Module.register('MMM-Face-Reco-DNN', {
       this.users = this.users.filter(function (u) {
         return u !== name;
       });
+
+      // Note: We keep voice message timing data even after logout
+      // to prevent spam when user logs in again too soon
 
       this.config.debug && Log.log('User list after logout:' + this.users);
 
