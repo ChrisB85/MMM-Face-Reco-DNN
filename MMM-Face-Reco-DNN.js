@@ -134,6 +134,7 @@ Module.register('MMM-Face-Reco-DNN', {
       bg: 'translations/bg.json',
       ru: 'translations/ru.json',
       nb: 'translations/nb.json',
+      pl: 'translations/pl.json',
     };
   },
 
@@ -209,11 +210,15 @@ Module.register('MMM-Face-Reco-DNN', {
         welcomeMessage = this.translate('knownlogin').replace('%person', personDisplayName);
       }
 
+      // Show visual notification
       this.sendNotification('SHOW_ALERT', {
         type: 'notification',
         message: welcomeMessage,
         title: this.translate('title'),
       });
+
+      // Send voice message to TTS module
+      this.sendNotification('MMM-Text-To-Speech', welcomeMessage);
     }
   },
 
