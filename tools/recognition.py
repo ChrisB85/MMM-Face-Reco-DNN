@@ -1,3 +1,7 @@
+# Suppress warnings that can break JSON parsing
+import warnings
+warnings.filterwarnings("ignore")
+
 import base64
 import cv2
 import face_recognition
@@ -12,7 +16,7 @@ from datetime import datetime
 from utils.image import Image
 from utils.arguments import Arguments
 from utils.print import Print
-from picamera2 import Picamera2
+from utils.mjpg_stream import MjpgStreamCapture
 
 def signalHandler(signal, frame):
     global closeSafe
@@ -61,9 +65,38 @@ resolution = (int(resolution[0]), int(resolution[1]))
 Print.printJson("status", resolution)
 Print.printJson("status", processWidth)
 
-picam2 = Picamera2()
-picam2.configure(picam2.create_preview_configuration(main={"size": (resolution[0], resolution[1]), "format": "XRGB8888"}))
-picam2.start()
+# Initialize camera based on configuration
+camera = None
+if Arguments.get("useMjpgStreamer"):
+    Print.printJson("status", "Using mjpg-streamer...")
+    stream_url = Arguments.get("mjpgStreamerUrl")
+    username = Arguments.get("mjpgStreamerUser") if Arguments.get("mjpgStreamerUser") else None
+    password = Arguments.get("mjpgStreamerPassword") if Arguments.get("mjpgStreamerPassword") else None
+    Print.printJson("status", "Mjpg-streamer URL: " + stream_url)
+    if username:
+        Print.printJson("status", "Mjpg-streamer authentication enabled for user: " + username)
+    else:
+        Print.printJson("status", "Mjpg-streamer authentication disabled")
+    camera = MjpgStreamCapture(stream_url, username, password)
+    Print.printJson("status", "Mjpg-streamer camera initialized successfully")
+else:
+    Print.printJson("status", "Using PiCamera2...")
+    Print.printJson("status", "PiCamera2 resolution: " + str(resolution[0]) + "x" + str(resolution[1]))
+    try:
+        from picamera2 import Picamera2
+        picam2 = Picamera2()
+        picam2.configure(picam2.create_preview_configuration(main={"size": (resolution[0], resolution[1]), "format": "XRGB8888"}))
+        picam2.start()
+        camera = picam2
+        Print.printJson("status", "PiCamera2 initialized successfully")
+    except ImportError as e:
+        Print.printJson("status", "Error importing Picamera2: " + str(e))
+        Print.printJson("status", "Falling back to mjpg-streamer...")
+        stream_url = Arguments.get("mjpgStreamerUrl")
+        username = Arguments.get("mjpgStreamerUser") if Arguments.get("mjpgStreamerUser") else None
+        password = Arguments.get("mjpgStreamerPassword") if Arguments.get("mjpgStreamerPassword") else None
+        camera = MjpgStreamCapture(stream_url, username, password)
+        Print.printJson("status", "Mjpg-streamer camera initialized as fallback")
 
 
 # variable for prev names
@@ -100,13 +133,15 @@ while True:
             # Externally triggered to run face recognition
             Print.printJson("status", "Starting face recognition.")
             run_face_recognition = True
-            picam2.start()
+            if not Arguments.get("useMjpgStreamer"):
+                camera.start()
 
         elif run_face_recognition == True and external_trigger == False:
             # Externally triggered to stop face recognition.
             Print.printJson("status", "Stopping face recognition and logging out any logged in users.")
             run_face_recognition = False
-            picam2.stop()
+            if not Arguments.get("useMjpgStreamer"):
+                camera.stop()
             
             # Log out any users that were logged in, and clear prevNames list
             if prevNames:
@@ -115,7 +150,14 @@ while True:
 
     if run_face_recognition:
         # read the frame
-        originalFrame = picam2.capture_array()
+        try:
+            if Arguments.get("useMjpgStreamer"):
+                originalFrame = camera.read()
+            else:
+                originalFrame = camera.capture_array()
+        except Exception as e:
+            Print.printJson("status", "Error reading frame from camera: " + str(e))
+            continue
 
         # adjust image brightness and contrast
         originalFrame = Image.adjust_brightness_contrast(
@@ -140,6 +182,7 @@ while True:
             boxes = face_recognition.face_locations(
                 rgb, model=Arguments.get("detectionMethod")
             )
+            Print.printJson("status", "DNN face detection found " + str(len(boxes)) + " faces")
         elif Arguments.get("method") == "haar":
             # convert the input frame from (1) BGR to grayscale (for face
             # detection) and (2) from BGR to RGB (for face recognition)
@@ -159,13 +202,16 @@ while True:
             # but we need them in (top, right, bottom, left) order, so we
             # need to do a bit of reordering
             boxes = [(y, x + w, y + h, x) for (x, y, w, h) in rects]
+            Print.printJson("status", "Haar face detection found " + str(len(boxes)) + " faces")
 
         # compute the facial embeddings for each face bounding box
         encodings = face_recognition.face_encodings(rgb, boxes)
         names = []
 
+        Print.printJson("status", "Processing " + str(len(encodings)) + " face encodings for recognition")
+
         # loop over the facial embeddings
-        for encoding in encodings:
+        for i, encoding in enumerate(encodings):
             # compute distances between this encoding and the faces in dataset
             distances = face_recognition.face_distance(data["encodings"], encoding)
 
@@ -178,8 +224,10 @@ while True:
             if minDistance < tolerance:
                 idx = numpy.where(distances == minDistance)[0][0]
                 name = data["names"][idx]
+                Print.printJson("status", "Face " + str(i+1) + ": Recognized as '" + name + "' (distance: " + f"{minDistance:.3f}" + ", tolerance: " + str(tolerance) + ")")
             else:
                 name = "unknown"
+                Print.printJson("status", "Face " + str(i+1) + ": Unknown person (distance: " + f"{minDistance:.3f}" + ", tolerance: " + str(tolerance) + ")")
 
             # update the list of names
             names.append(name)
@@ -229,17 +277,23 @@ while True:
 
         # send inforrmation to prompt, only if something has changes
         if logins.__len__() > 0:
+            Print.printJson("status", "Users logging in: " + ', '.join(logins))
             Print.printJson("login", {"names": logins})
 
         if logouts.__len__() > 0:
+            Print.printJson("status", "Users logging out: " + ', '.join(logouts))
             Print.printJson("logout", {"names": logouts})
 
         # set this names as new prev names for next iteration
         prevNames = names
 
-    key = cv2.waitKey(1) & 0xFF
-    # if the `q` key was pressed, break from the loop
-    if key == ord("q") or closeSafe == True:
+    # Only use cv2.waitKey if we're showing output
+    if Arguments.get("output") == 1:
+        key = cv2.waitKey(1) & 0xFF
+        # if the `q` key was pressed, break from the loop
+        if key == ord("q") or closeSafe == True:
+            break
+    elif closeSafe == True:
         break
     
     # Calculate how long the loop ran thus far. If loop time was less than 
@@ -249,5 +303,10 @@ while True:
 
 
 # do a bit of cleanup
-picam2.stop()
-cv2.destroyAllWindows()
+if Arguments.get("useMjpgStreamer"):
+    camera.stop()
+else:
+    camera.stop()
+# Only destroy windows if we were showing output
+if Arguments.get("output") == 1:
+    cv2.destroyAllWindows()

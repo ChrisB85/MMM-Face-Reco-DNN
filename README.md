@@ -16,6 +16,7 @@ This module works in the background, and so no screenshots are available.
 - [numpy](#numpy)
 - [picamera2](#picamera2)
 - [libcap-dev](#libcap-dev)
+- [requests](#requests) (for mjpg-streamer support)
 
 ## Installation
 
@@ -39,7 +40,7 @@ For the installation procedure to work, you first need the following installed b
 - install python dependencies
   - If you working with Bookworm you need to create first an virtual environment, please have a look in the next chapter
   - Numpy versions 2.0+ do not seem to work with this module
-  - `pip install face-recognition numpy==1.26.4 dlib picamera2 opencv-python`
+  - `pip install face-recognition numpy==1.26.4 dlib picamera2 opencv-python requests`
 
 ### Some additional steps for Bookworm and above to run it with an virtual environment
 
@@ -47,7 +48,7 @@ If you want/need to install it with an virtual environment, you need to do follo
 
 - create environment with `python3 -m venv ~/python-facereco`
 - activate environment with `source ~/python-facereco/bin/activate`
-- install pip packages with `pip install face-recognition numpy==1.26.4 dlib picamera2 opencv-python`
+- install pip packages with `pip install face-recognition numpy==1.26.4 dlib picamera2 opencv-python requests`
 - Because some libraries uses global installed libs which are not available with pip, you need to change the config of your virtual environment
   - `nano ~/python-facereco/pyvenv.cfg`
   - Change line `include-system-site-packages = false` to `include-system-site-packages = true`
@@ -102,6 +103,30 @@ npm run encode
 ```
 
 After that you are ready to configure the module and use it on your MagicMirror.
+
+### Mjpg-Streamer Support
+
+This module now supports mjpg-streamer as an alternative to direct camera access. This is useful when you want to use a camera that's accessed through mjpg-streamer instead of direct USB or PiCamera access.
+
+To use mjpg-streamer:
+
+1. Set `useMjpgStreamer: true` in the module configuration
+2. Configure the `mjpgStreamerUrl` to point to your mjpg-streamer stream (default: "http://localhost:8081/?action=stream")
+3. Optionally set `mjpgStreamerUser` and `mjpgStreamerPassword` if your stream requires authentication
+
+Example configuration:
+```js
+{
+    module: 'MMM-Face-Reco-DNN',
+    config: {
+        useMjpgStreamer: true,
+        mjpgStreamerUrl: "http://192.168.1.100:8081/?action=stream",
+        mjpgStreamerUser: "admin",
+        mjpgStreamerPassword: "password",
+        // ... other config options
+    }
+}
+```
 
 ### Module Usage
 
@@ -176,6 +201,12 @@ To setup the module in MagicMirror², add the following section to the `config.j
       // exmaple with with MMM-Pir with notification name 'MMM_PIR-SCREEN_POWERSTATUS' to only run face 
       // recognition when screen is on.
       external_trigger_notification: '',
+      // Use mjpg-streamer instead of direct camera access
+      useMjpgStreamer: false,
+      // mjpg-streamer configuration
+      mjpgStreamerUrl: "http://localhost:8081/?action=stream",
+      mjpgStreamerUser: "",
+      mjpgStreamerPassword: "",
     }
 }
 ```

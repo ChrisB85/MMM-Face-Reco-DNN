@@ -37,9 +37,13 @@ module.exports = NodeHelper.create({
         '--tolerance=' + this.config.tolerance,
         '--brightness=' + this.config.brightness,
         '--contrast=' + this.config.contrast,
-        '--resolution=' + this.config.resolution,
+        '--resolution=' + this.config.resolution.join(','),
         '--processWidth=' + this.config.processWidth,
         '--run-only-on-notification=' + (this.config.external_trigger_notification !== '' ? '1' : '0'),
+        '--useMjpgStreamer=' + (this.config.useMjpgStreamer ? 'True' : 'False'),
+        '--mjpgStreamerUrl=' + this.config.mjpgStreamerUrl,
+        '--mjpgStreamerUser=' + this.config.mjpgStreamerUser,
+        '--mjpgStreamerPassword=' + this.config.mjpgStreamerPassword,
       ],
     };
 
@@ -66,7 +70,7 @@ module.exports = NodeHelper.create({
 
       // Check if we get an image to show in the mirror
       if (Object.prototype.hasOwnProperty.call(message, 'login')) {
-        console.log('[' + self.name + '] ' + 'Users ' + message.login.names.join(' - ') + ' logged in.');
+        console.log('[' + self.name + '] ' + 'Face recognition: Users ' + message.login.names.join(' - ') + ' detected and logging in.');
         self.sendSocketNotification('user', {
           action: 'login',
           users: message.login.names,
@@ -75,7 +79,7 @@ module.exports = NodeHelper.create({
 
       // Somebody left the camera, send it back to the Magic Mirror Module
       if (Object.prototype.hasOwnProperty.call(message, 'logout')) {
-        console.log('[' + self.name + '] ' + 'Users ' + message.logout.names.join(' - ') + ' logged out.');
+        console.log('[' + self.name + '] ' + 'Face recognition: Users ' + message.logout.names.join(' - ') + ' no longer detected, logging out.');
         self.sendSocketNotification('user', {
           action: 'logout',
           users: message.logout.names,
@@ -111,10 +115,16 @@ module.exports = NodeHelper.create({
     // Configuration are received
     if (notification === 'CONFIG') {
       this.config = payload;
+      console.log('[' + this.name + '] Configuration received');
+      console.log('[' + this.name + '] Camera type: ' + (this.config.useMjpgStreamer ? 'mjpg-streamer' : 'PiCamera2'));
+      if (this.config.useMjpgStreamer) {
+        console.log('[' + this.name + '] Mjpg-streamer URL: ' + this.config.mjpgStreamerUrl);
+      }
       // Set static output to 0, because we do not need any output for MMM
       this.config.output = 0;
       if (!pythonStarted) {
         pythonStarted = true;
+        console.log('[' + this.name + '] Starting Python face recognition process...');
         this.python_start();
       }
     }
@@ -123,8 +133,10 @@ module.exports = NodeHelper.create({
     // if it has been started
     if (notification === this.config.external_trigger_notification && pythonStarted) {
       if (payload === true) {
+        console.log('[' + this.name + '] External trigger: Starting face recognition');
         this.send_python_cmd('start');
       } else {
+        console.log('[' + this.name + '] External trigger: Stopping face recognition');
         this.send_python_cmd('stop');
       }
     }

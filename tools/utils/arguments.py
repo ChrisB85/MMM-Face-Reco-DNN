@@ -147,5 +147,33 @@ class Arguments:
             default=0,
             help="If 1, only runs face detection upon external trigger. If 0, face detection runs all the time.",
         )
+        ap.add_argument(
+            "-umj",
+            "--useMjpgStreamer",
+            type=Helper.str2bool,
+            default=False,
+            help="Use mjpg-streamer instead of direct camera access",
+        )
+        ap.add_argument(
+            "-msu",
+            "--mjpgStreamerUrl",
+            type=str,
+            default="http://localhost:8081/?action=stream",
+            help="URL to the mjpg-streamer stream",
+        )
+        ap.add_argument(
+            "-msuser",
+            "--mjpgStreamerUser",
+            type=str,
+            default="",
+            help="Username for mjpg-streamer authentication",
+        )
+        ap.add_argument(
+            "-mspass",
+            "--mjpgStreamerPassword",
+            type=str,
+            default="",
+            help="Password for mjpg-streamer authentication",
+        )
 
         Arguments.args = vars(ap.parse_args())

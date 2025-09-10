@@ -77,6 +77,12 @@ Module.register('MMM-Face-Reco-DNN', {
     // exmaple with with MMM-Pir with notification name 'MMM_PIR-SCREEN_POWERSTATUS' to only run face 
     // recognition when screen is on.
     external_trigger_notification: '',
+    // Use mjpg-streamer instead of direct camera access
+    useMjpgStreamer: false,
+    // mjpg-streamer configuration
+    mjpgStreamerUrl: "http://localhost:8081/?action=stream",
+    mjpgStreamerUser: "",
+    mjpgStreamerPassword: "",
   },
 
   timouts: {},
@@ -90,6 +96,20 @@ Module.register('MMM-Face-Reco-DNN', {
     Log.log('Starting module: ' + this.name);
 
     this.config.debug && Log.log(this.config);
+
+    // Log camera configuration
+    if (this.config.useMjpgStreamer) {
+      Log.log('Camera: Using mjpg-streamer');
+      Log.log('Mjpg-streamer URL: ' + this.config.mjpgStreamerUrl);
+      if (this.config.mjpgStreamerUser) {
+        Log.log('Mjpg-streamer authentication: enabled for user ' + this.config.mjpgStreamerUser);
+      } else {
+        Log.log('Mjpg-streamer authentication: disabled');
+      }
+    } else {
+      Log.log('Camera: Using PiCamera2');
+      Log.log('Resolution: ' + this.config.resolution[0] + 'x' + this.config.resolution[1]);
+    }
 
     // there are 3 states (noface, unknown face, known face). Each of these has classes that allow them
     // this configuration defines which classes provide which states
@@ -124,7 +144,7 @@ Module.register('MMM-Face-Reco-DNN', {
     var newClassList;
 
     this.config.debug && Log.log('User list before login:' + this.users);
-    Log.log('Logged in user:' + name);
+    Log.log('User login: ' + name + ' detected and logging in');
     // user not currently logged in so add them to the list of logged in users
     this.users.push(name);
     this.config.debug && Log.log('User list after login:' + this.users);
@@ -200,7 +220,7 @@ Module.register('MMM-Face-Reco-DNN', {
   // ----------------------------------------------------------------------------------------------------
   logout_user: function (name) {
     this.config.debug && Log.log('User list before logout:' + this.users);
-    Log.log('Logged out user:' + name);
+    Log.log('User logout: ' + name + ' no longer detected, logging out');
 
     // just double check the the user we are logging out is actually logged in
     if (this.users.includes(name)) {
