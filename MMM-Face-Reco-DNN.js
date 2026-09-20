@@ -203,7 +203,12 @@ Module.register('MMM-Face-Reco-DNN', {
       // We get unknown from Face-Reco and then it should be translated to stranger
       if (person === 'unknown') {
         person = this.translate('stranger');
-        welcomeMessage = this.translate('unknownlogin').replace('%person', person);
+        // the translation may hold a list of greetings, one of them is picked at random
+        var greeting = this.translate('unknownlogin');
+        if (Array.isArray(greeting)) {
+          greeting = greeting[Math.floor(Math.random() * greeting.length)];
+        }
+        welcomeMessage = greeting.replace('%person', person);
       } else {
         // set up the slightly different message for a known person, attempt to find a Name mapping for display purposes
         var personDisplayName = person;

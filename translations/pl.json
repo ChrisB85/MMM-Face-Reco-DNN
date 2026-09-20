@@ -1,6 +1,18 @@
 {
   "knownlogin": "Cześć %person!",
-  "unknownlogin": "Cześć %person, miło Cię poznać!",
+  "unknownlogin": [
+    "Nowa twarz przed lustrem. Witam!",
+    "Chyba jeszcze się nie poznaliśmy. Dzień dobry!",
+    "Nie mam Cię w pamięci, ale i tak się cieszę.",
+    "Kogo tu widzę? Kogoś zupełnie nowego.",
+    "Nieznana twarz wykryta. Spokojnie, nie gryzę.",
+    "Witaj. Jeszcze Cię nie znam, ale to się może zmienić.",
+    "Dzień dobry. Nie rozpoznaję tej twarzy.",
+    "Obawiam się, że nie mam Cię w swojej bazie.",
+    "Rejestruję nieznaną obecność. Wszystkie systemy sprawne.",
+    "Widzę Cię wyraźnie. Nie wiem jeszcze, kim jesteś.",
+    "Nie figurujesz w mojej pamięci. To kwestia czasu."
+  ],
   "title": "Rozpoznawanie twarzy",
   "stranger": "nieznajomy"
 }
