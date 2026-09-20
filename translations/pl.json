@@ -1,5 +1,16 @@
 {
-  "knownlogin": "Cześć %person!",
+  "knownlogin": [
+    "Cześć %person!",
+    "Dzień dobry, %person.",
+    "Witaj, %person.",
+    "O, %person! Dobrze Cię widzieć.",
+    "Miło Cię widzieć, %person.",
+    "Rozpoznaję Cię, %person.",
+    "Znowu Ty, %person. Doskonale.",
+    "%person, wszystkie systemy sprawne.",
+    "Twarz rozpoznana. Witaj, %person.",
+    "%person. Widzę Cię wyraźnie."
+  ],
   "unknownlogin": [
     "Nowa twarz przed lustrem. Witam!",
     "Chyba jeszcze się nie poznaliśmy. Dzień dobry!",

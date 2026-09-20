@@ -142,6 +142,13 @@ Module.register('MMM-Face-Reco-DNN', {
   },
 
   // ----------------------------------------------------------------------------------------------------
+  // a greeting translation may hold a list of variants, one of them is then picked at random
+  pick_greeting: function (key) {
+    var greeting = this.translate(key);
+    return Array.isArray(greeting) ? greeting[Math.floor(Math.random() * greeting.length)] : greeting;
+  },
+
+  // ----------------------------------------------------------------------------------------------------
   login_user: function (name) {
     var thisUserClasses;
     var existingClasses;
@@ -203,19 +210,14 @@ Module.register('MMM-Face-Reco-DNN', {
       // We get unknown from Face-Reco and then it should be translated to stranger
       if (person === 'unknown') {
         person = this.translate('stranger');
-        // the translation may hold a list of greetings, one of them is picked at random
-        var greeting = this.translate('unknownlogin');
-        if (Array.isArray(greeting)) {
-          greeting = greeting[Math.floor(Math.random() * greeting.length)];
-        }
-        welcomeMessage = greeting.replace('%person', person);
+        welcomeMessage = this.pick_greeting('unknownlogin').replace('%person', person);
       } else {
         // set up the slightly different message for a known person, attempt to find a Name mapping for display purposes
         var personDisplayName = person;
         if (this.config.usernameDisplayMapping && this.config.usernameDisplayMapping[person]) {
           personDisplayName = this.config.usernameDisplayMapping[person];
         }
-        welcomeMessage = this.translate('knownlogin').replace('%person', personDisplayName);
+        welcomeMessage = this.pick_greeting('knownlogin').replace('%person', personDisplayName);
       }
 
       // Show visual notification
