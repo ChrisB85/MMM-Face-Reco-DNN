@@ -59,7 +59,7 @@ class MjpgStreamCapture(object):
                 
                 # Read the MJPEG stream
                 buffer = b''
-                for chunk in response.iter_content(chunk_size=1024):
+                for chunk in response.iter_content(chunk_size=65536):
                     buffer += chunk
                     
                     # Look for MJPEG frame boundaries
@@ -74,19 +74,14 @@ class MjpgStreamCapture(object):
                         if end == -1:
                             break
                             
-                        # Extract JPEG frame (include end marker)
+                        # Extract JPEG frame (include end marker). Keep it
+                        # encoded: recognition uses one frame per interval, so
+                        # decoding every frame of a 30 fps stream is wasted CPU.
                         jpg = buffer[start:end+2]
                         buffer = buffer[end+2:]
-                        
-                        # Decode JPEG to OpenCV image
-                        try:
-                            frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
-                            if frame is not None:
-                                with self._capture_lock:
-                                    self._capture_frame = frame
-                        except Exception as e:
-                            print(f"Error decoding frame: {e}")
-                            
+                        with self._capture_lock:
+                            self._capture_frame = jpg
+
             except requests.exceptions.RequestException as e:
                 print(f"Stream connection error: {e}")
                 time.sleep(1)  # Wait before retrying
@@ -100,16 +95,17 @@ class MjpgStreamCapture(object):
         """Read a single frame from the stream and return the data as an OpenCV
         image (which is a numpy array).
         """
-        frame = None
-        with self._capture_lock:
-            frame = self._capture_frame
         # If there are problems, keep retrying until an image can be read.
-        while frame is None:
-            time.sleep(0)
+        # Sleep between tries: with the stream down this loop would otherwise
+        # spin a whole core.
+        while True:
             with self._capture_lock:
-                frame = self._capture_frame
-        # Return the capture image data.
-        return frame
+                jpg = self._capture_frame
+            if jpg is not None:
+                frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                if frame is not None:
+                    return frame
+            time.sleep(0.05)
         
     def stop(self):
         """Stop the capture thread and cleanup resources."""
