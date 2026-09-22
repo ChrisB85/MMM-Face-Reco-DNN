@@ -15,6 +15,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 import numpy as np
 from io import BytesIO
+from utils.print import Print
 
 # Rate at which the stream will be polled for new images.
 CAPTURE_HZ = 30.0
@@ -83,10 +84,12 @@ class MjpgStreamCapture(object):
                             self._capture_frame = jpg
 
             except requests.exceptions.RequestException as e:
-                print(f"Stream connection error: {e}")
+                # stdout is a JSON channel to node_helper (python-shell, mode json):
+                # a plain print() there throws in MagicMirror and silences recognition.
+                Print.printJson("status", f"Stream connection error: {e}")
                 time.sleep(1)  # Wait before retrying
             except Exception as e:
-                print(f"Unexpected error in stream capture: {e}")
+                Print.printJson("status", f"Unexpected error in stream capture: {e}")
                 time.sleep(1)
                 
             time.sleep(1.0 / CAPTURE_HZ)

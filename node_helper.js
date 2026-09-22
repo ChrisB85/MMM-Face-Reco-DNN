@@ -23,6 +23,16 @@ module.exports = NodeHelper.create({
       mode: 'json',
       pythonOptions: ['-u'], // Immediately flush buffer for std out/in monitoring/writing to work
       stderrParser: line => JSON.stringify(line),
+      // A non-JSON line on stdout (a stray print() in Python or a library)
+      // makes python-shell's JSON parser throw, which silently stops all
+      // further messages from recognition. Pass such lines on as status.
+      parser: line => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return { status: line };
+        }
+      },
       args: [
         '--cascade=' + this.config.cascade,
         '--encodings=' + this.config.encodings,
