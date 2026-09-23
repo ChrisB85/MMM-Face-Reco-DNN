@@ -84,7 +84,8 @@ stream: less code, and nothing keeps streaming when the phone screen turns off.
 - Person name: `^[\p{L}\p{N}_-]{1,40}$` (Unicode letters, so Polish names work).
   The name is also the directory name, the name in `USERS_LOGIN` and the key used in
   `classes` of the mirror config.
-- Photo file name: `^[\p{L}\p{N}_-]{1,80}\.jpg$`.
+- Photo file name: `^[\p{L}\p{N}_ ()-]{1,80}\.(jpe?g|png)$` (case-insensitive), so photos
+  copied in by hand earlier stay visible and deletable. No `/`, `\` or `.` in the stem.
 - Every resolved path is checked to stay inside the dataset directory.
 - Anything else returns 400.
 
@@ -94,11 +95,12 @@ with a numeric suffix on collision.
 ### Training
 
 1. Refuse with 400 when the dataset holds no photos at all.
-2. Run `tools/encode.py -i <dataset> -e <encodings>.tmp -d <detectionMethod>` through
-   `python-shell` with the configured `pythonPath`.
+2. Run `tools/encode.py -i <dataset> -e <encodings>.tmp -d <detectionMethod>` with
+   `child_process.spawn` and the configured `pythonPath` (default `python3`).
 3. On success `rename` the temporary file over `encodings` (atomic; a failed run keeps
-   the old model), then stop and start `recognition.py` via the existing
-   `python_stop` / `python_start`.
+   the old model), then kill `recognition.py` and start it again with `python_start`.
+   Before the restart the helper sends a logout for everyone the old process had logged
+   in: the new process never reports their logout, and logs back in whoever is still there.
 4. On failure keep the old model and store the error.
 
 Recognition keeps running while `encode.py` works (Pi 5, 4 cores). The training state
@@ -106,7 +108,8 @@ Recognition keeps running while `encode.py` works (Pi 5, 4 cores). The training 
 memory; the page polls `/api/people` while a run is active.
 
 `encode.py` gets one change: an image with a face count other than 1 is skipped and
-reported on stdout as `[SKIP] <person>/<file>: <n> faces`. `encode.py` assigns every face
+reported on stdout as `[SKIP] <person>/<file>: <n> faces`; an unreadable image is
+  reported as `[SKIP] <person>/<file>: unreadable` instead of crashing the run. `encode.py` assigns every face
 in an image to the person, so a photo with two people would poison the model.
 The helper collects these lines and the UI lists skipped photos with a delete button.
 Validation happens at training time, so no Python process and no dlib load per photo.
@@ -148,8 +151,9 @@ Plain HTML and JavaScript, no framework, no build step, mobile first, Polish UI 
 
 ## Testing
 
-- One `node:test` file for the pure functions: name validation, path containment,
-  `stale` computation, PIN check.
+- `node:test` files for the pure functions (name validation, path containment, `stale`,
+  PIN check), the trainer (with a fake Python script) and the routes (real Express on a
+  random port, fake camera, fake trainer).
 - Manual on the mirror: curl against every route (with and without PIN), then the full
   flow from a phone: add person, capture, upload, retrain, check `USERS_LOGIN` in
   `journalctl -u magicmirror`.
