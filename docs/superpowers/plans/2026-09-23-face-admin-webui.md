@@ -74,7 +74,7 @@ All paths below are relative to `MagicMirror/modules/MMM-Face-Reco-DNN/` unless 
 In `"scripts"` add:
 
 ```json
-    "test": "node --test tests/",
+    "test": "node --test",
 ```
 
 - [ ] **Step 2: Write the failing tests**
