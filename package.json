@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/nischi/MMM-Face-Reco-DNN#readme",
   "scripts": {
+    "test": "node --test",
     "lint": "eslint .",
     "prettier": "prettier --write **/*.js",
     "encode": "python tools/encode.py -i dataset -e model/encodings.pickle",
