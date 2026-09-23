@@ -28,6 +28,10 @@ for i, imagePath in enumerate(imagePaths):
     # load the input image and convert it from RGB (OpenCV ordering)
     # to dlib ordering (RGB)
     image = cv2.imread(imagePath)
+    photo = os.path.join(name, os.path.basename(imagePath))
+    if image is None:
+        print("[SKIP] {}: unreadable".format(photo))
+        continue
     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # detect the (x, y)-coordinates of the bounding boxes
@@ -35,6 +39,12 @@ for i, imagePath in enumerate(imagePaths):
     boxes = face_recognition.face_locations(
         rgb, model=Arguments.get("detection_method")
     )
+
+    # Every face in a photo is stored under the person's name, so a photo
+    # with no face or with someone else in it would poison the model.
+    if len(boxes) != 1:
+        print("[SKIP] {}: {} faces".format(photo, len(boxes)))
+        continue
 
     # compute the facial embedding for the face
     encodings = face_recognition.face_encodings(rgb, boxes)
