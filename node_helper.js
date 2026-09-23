@@ -12,7 +12,17 @@
 const NodeHelper = require('node_helper');
 const { PythonShell } = require('python-shell');
 const onExit = require('signal-exit');
+const path = require('path');
+const fs = require('fs');
 var pythonStarted = false;
+// Users the recognition process has logged in and not yet out; needed to log
+// them out when the process is restarted after training.
+const loggedIn = new Set();
+const ADMIN_DEFAULTS = {
+  enabled: false,
+  pin: '',
+  cameraFrameUrl: 'http://127.0.0.1:1984/api/frame.jpeg?src=c925e_face',
+};
 
 module.exports = NodeHelper.create({
   pyshell: null,
@@ -81,6 +91,7 @@ module.exports = NodeHelper.create({
       // Check if we get an image to show in the mirror
       if (Object.prototype.hasOwnProperty.call(message, 'login')) {
         console.log('[' + self.name + '] ' + 'Face recognition: Users ' + message.login.names.join(' - ') + ' detected and logging in.');
+        message.login.names.forEach(name => loggedIn.add(name));
         self.sendSocketNotification('user', {
           action: 'login',
           users: message.login.names,
@@ -90,6 +101,7 @@ module.exports = NodeHelper.create({
       // Somebody left the camera, send it back to the Magic Mirror Module
       if (Object.prototype.hasOwnProperty.call(message, 'logout')) {
         console.log('[' + self.name + '] ' + 'Face recognition: Users ' + message.logout.names.join(' - ') + ' no longer detected, logging out.');
+        message.logout.names.forEach(name => loggedIn.delete(name));
         self.sendSocketNotification('user', {
           action: 'logout',
           users: message.logout.names,
@@ -97,9 +109,13 @@ module.exports = NodeHelper.create({
       }
     });
 
-    onExit(function (_code, _signal) {
-      self.destroy();
-    });
+    // python_start runs again after every training; one exit hook is enough.
+    if (!self.exitHooked) {
+      self.exitHooked = true;
+      onExit(function (_code, _signal) {
+        self.destroy();
+      });
+    }
   },
 
   send_python_cmd: function (cmd) {
@@ -108,6 +124,49 @@ module.exports = NodeHelper.create({
 
   python_stop: function () {
     this.destroy();
+  },
+
+  // The new process starts with nobody logged in and never reports a logout for
+  // people the old one saw, so log them out here. Whoever is still in front of
+  // the camera gets logged in again by the new process.
+  python_restart: function () {
+    console.log('[' + this.name + '] Model retrained, restarting recognition');
+    if (loggedIn.size > 0) {
+      this.sendSocketNotification('user', { action: 'logout', users: [...loggedIn] });
+      loggedIn.clear();
+    }
+    this.pyshell.childProcess.kill();
+    this.python_start();
+  },
+
+  admin_start: function () {
+    const admin = Object.assign({}, ADMIN_DEFAULTS, this.config.admin);
+    if (admin.enabled !== true) return;
+    if (!admin.pin) {
+      console.warn('[' + this.name + '] Admin UI not started: admin.pin is empty');
+      return;
+    }
+    const dataset = path.resolve(global.root_path, this.config.dataset);
+    const encodings = path.resolve(global.root_path, this.config.encodings);
+    const { isServedPath } = require('./admin/lib');
+    if (isServedPath(dataset, global.root_path) || isServedPath(encodings, global.root_path)) {
+      console.error('[' + this.name + '] Admin UI not started: dataset and encodings must live outside directories MagicMirror serves (e.g. /home/dietpi/face-reco/)');
+      return;
+    }
+    fs.mkdirSync(dataset, { recursive: true });
+
+    const { createTrainer } = require('./admin/trainer');
+    const { createAdminRouter } = require('./admin/routes');
+    const trainer = createTrainer({
+      pythonPath: this.config.pythonPath,
+      script: path.join(this.path, 'tools', 'encode.py'),
+      dataset,
+      encodings,
+      detectionMethod: this.config.detectionMethod,
+      onTrained: () => this.python_restart(),
+    });
+    this.expressApp.use('/' + this.name + '/admin', createAdminRouter({ dataset, encodings, pin: String(admin.pin), cameraFrameUrl: admin.cameraFrameUrl, trainer }));
+    console.log('[' + this.name + '] Admin UI at /' + this.name + '/admin/');
   },
 
   destroy: function () {
@@ -136,6 +195,7 @@ module.exports = NodeHelper.create({
         pythonStarted = true;
         console.log('[' + this.name + '] Starting Python face recognition process...');
         this.python_start();
+        this.admin_start();
       }
     }
 

@@ -211,6 +211,37 @@ To setup the module in MagicMirror², add the following section to the `config.j
 }
 ```
 
+### Admin Web UI
+
+Manage the dataset from a phone: add, rename and delete people, take photos with the
+mirror camera or upload them from the phone, and retrain without restarting MagicMirror.
+
+```js
+admin: {
+  enabled: true,
+  pin: "choose-a-pin",
+  // one JPEG frame from the camera the recognition uses
+  cameraFrameUrl: "http://127.0.0.1:1984/api/frame.jpeg?src=c925e_face",
+},
+// Both must live outside the directories MagicMirror serves (modules, config, ...),
+// otherwise anyone on the network could download the photos and the admin UI stays off.
+dataset: "/home/dietpi/face-reco/dataset/",
+encodings: "/home/dietpi/face-reco/encodings.pickle",
+```
+
+Open `http://<mirror>:8080/MMM-Face-Reco-DNN/admin/` and enter the PIN as the password
+(any user name). "Przeszkol" runs `tools/encode.py`; photos without exactly one face are
+skipped and marked in red. The person's name is the directory name and the name used in
+`classes`, so fix `classes` by hand after renaming or deleting someone.
+
+Moving an existing dataset:
+
+```bash
+mkdir -p ~/face-reco
+mv ~/MagicMirror/modules/MMM-Face-Reco-DNN/dataset ~/face-reco/dataset
+mv ~/MagicMirror/modules/MMM-Face-Reco-DNN/model/encodings.pickle ~/face-reco/
+```
+
 ## Notifications
 
 The module sends notifications if a user is logged in or logged out. In addition you can request the list of logged-in users to check if somebody is in front of the mirror. You can then use it for your own module, such as [MMM-MotionControl](https://github.com/nischi/MMM-MotionControl).
