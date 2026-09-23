@@ -427,7 +427,6 @@ Module.register('MMM-Face-Reco-DNN', {
   // ----------------------------------------------------------------------------------------------------
   socketNotificationReceived: function (notification, payload) {
     var self = this;
-    var user;
 
     if (notification === 'camera_image') {
       this.image = payload.image;
@@ -437,7 +436,7 @@ Module.register('MMM-Face-Reco-DNN', {
     // somebody has logged in
     if (payload.action === 'login') {
       var loginCount = 0;
-      for (user of payload.users) {
+      for (const user of payload.users) {
         if (user != null) {
           // if there are currently no users logged in OR we allow multiple users
           this.config.debug && Log.log('Number of logged in users:' + this.users.length + ', Allowed Number of Users:' + this.config.multiUser);
@@ -477,7 +476,7 @@ Module.register('MMM-Face-Reco-DNN', {
       }
     } else if (payload.action === 'logout') {
       var logoutCount = 0;
-      for (user of payload.users) {
+      for (const user of payload.users) {
         if (user != null) {
           // see if user is even logged in, since you can only log out if you are actually logged in
           if (this.users.includes(user)) {

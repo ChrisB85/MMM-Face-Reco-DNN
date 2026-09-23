@@ -72,10 +72,15 @@ module.exports = NodeHelper.create({
     }
 
     // Start face reco script
-    self.pyshell = new PythonShell('modules/' + this.name + '/tools/recognition.py', options);
+    const shell = new PythonShell('modules/' + this.name + '/tools/recognition.py', options);
+    self.pyshell = shell;
 
     // check if a message of the python script is comming in
-    self.pyshell.on('message', function (message) {
+    shell.on('message', function (message) {
+      // A process killed by python_restart can still print its last login or
+      // logout; only the current process may change who is logged in.
+      if (shell !== self.pyshell) return;
+
       // A status message has received and will log
       if (Object.prototype.hasOwnProperty.call(message, 'status')) {
         console.log('[' + self.name + '] ' + message.status);
@@ -131,10 +136,11 @@ module.exports = NodeHelper.create({
   // the camera gets logged in again by the new process.
   python_restart: function () {
     console.log('[' + this.name + '] Model retrained, restarting recognition');
-    if (loggedIn.size > 0) {
-      this.sendSocketNotification('user', { action: 'logout', users: [...loggedIn] });
-      loggedIn.clear();
+    // One notification per name: the front end handles one user per logout best.
+    for (const name of loggedIn) {
+      this.sendSocketNotification('user', { action: 'logout', users: [name] });
     }
+    loggedIn.clear();
     this.pyshell.childProcess.kill();
     this.python_start();
   },

@@ -17,20 +17,24 @@ function touch(file, seconds) {
   fs.utimesSync(file, seconds, seconds);
 }
 
-test('isValidName accepts Polish names and rejects separators', () => {
-  for (const ok of ['Krzysiek', 'Łucja', 'Żaneta', 'Ania_2', 'jan-kowalski']) {
+test('isValidName accepts any directory name encode.py trains on, but no separators', () => {
+  for (const ok of ['Krzysiek', 'Łucja', 'Żaneta', 'Ania_2', 'jan-kowalski', 'Jan Kowalski', 'J.K.']) {
     assert.ok(lib.isValidName(ok), ok);
   }
-  for (const bad of ['', '.', '..', 'a/b', 'a\\b', 'a b', 'a.b', 'x'.repeat(41), undefined, null, 42]) {
+  for (const bad of ['', '.', '..', '.hidden', 'a/b', 'a\\b', ' a', 'a ', 'a\nb', 'x'.repeat(41), undefined, null, 42]) {
     assert.ok(!lib.isValidName(bad), String(bad));
   }
 });
 
-test('isValidPhoto accepts hand-placed photos and rejects traversal', () => {
-  for (const ok of ['k01.jpg', 'dowod.jpg', 'IMG 1234 (1).JPG', 'a.jpeg', 'Łucja_20260923_101010.jpg', 'x.png']) {
+test('isValidPhoto accepts every photo encode.py trains on and rejects traversal', () => {
+  const trained = [
+    'k01.jpg', 'dowod.jpg', 'IMG 1234 (1).JPG', 'a.jpeg', 'Łucja_20260923_101010.jpg', 'x.png', 'a..jpg',
+    'WhatsApp Image 2024-05-01 at 10.12.33.jpeg', 'IMG_20240501_101233~2.jpg', 'zdjęcie, kopia.jpg', 'a+b.jpg', 'a.bmp', 'a.TIF', 'a.tiff',
+  ];
+  for (const ok of trained) {
     assert.ok(lib.isValidPhoto(ok), ok);
   }
-  for (const bad of ['.jpg', 'a.gif', '../a.jpg', 'a/b.jpg', 'a.jpg.sh', 'a..jpg', '', undefined]) {
+  for (const bad of ['.jpg', '.x.jpg', 'a.gif', '../a.jpg', 'a/b.jpg', 'a\\b.jpg', 'a.jpg.sh', '', undefined]) {
     assert.ok(!lib.isValidPhoto(bad), String(bad));
   }
 });
@@ -93,7 +97,8 @@ test('listPeople lists valid people and photos, sorted', t => {
   const dataset = tmpDir(t);
   fs.mkdirSync(path.join(dataset, 'Zosia'));
   fs.mkdirSync(path.join(dataset, 'Ania'));
-  fs.mkdirSync(path.join(dataset, 'bad name'));
+  fs.mkdirSync(path.join(dataset, '.hidden'));
+  fs.mkdirSync(path.join(dataset, 'Jan Kowalski'));
   fs.writeFileSync(path.join(dataset, 'loose.jpg'), 'x');
   fs.writeFileSync(path.join(dataset, 'Ania', 'k02.jpg'), 'x');
   fs.writeFileSync(path.join(dataset, 'Ania', 'k01.jpg'), 'x');
@@ -101,6 +106,7 @@ test('listPeople lists valid people and photos, sorted', t => {
 
   assert.deepEqual(lib.listPeople(dataset), [
     { name: 'Ania', photos: ['k01.jpg', 'k02.jpg'] },
+    { name: 'Jan Kowalski', photos: [] },
     { name: 'Zosia', photos: [] },
   ]);
 });

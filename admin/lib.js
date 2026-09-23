@@ -4,8 +4,12 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const NAME_RE = /^[\p{L}\p{N}_-]{1,40}$/u;
-const PHOTO_RE = /^[\p{L}\p{N}_ ()-]{1,80}\.(jpe?g|png)$/iu;
+// Anything encode.py trains on must be listable and deletable, so names are any
+// single path segment: no separators or control characters, no leading dot
+// (hidden, and ".." escapes), no surrounding spaces.
+const NAME_RE = /^(?![.\s])[^/\\\p{Cc}]{1,40}(?<!\s)$/u;
+// Extensions from tools/utils/image.py.
+const PHOTO_RE = /^(?![.\s])[^/\\\p{Cc}]{1,120}\.(jpe?g|png|bmp|tiff?)$/iu;
 // Directories MagicMirror's js/server.js serves statically to every client.
 const SERVED_DIRS = ['config', 'css', 'fonts', 'js', 'modules', 'tests', 'translations', 'vendor'];
 

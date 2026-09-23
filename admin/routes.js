@@ -9,8 +9,16 @@ function createAdminRouter({ dataset, encodings, pin, cameraFrameUrl, trainer })
   const router = express.Router();
   const fail = (res, status, error) => res.status(status).json({ error });
 
+  // A short PIN falls to a script on the LAN in seconds. After ten wrong PINs within
+  // a minute every request waits out that minute, the right PIN included.
+  const failures = [];
   router.use((req, res, next) => {
+    const now = Date.now();
+    while (failures.length > 0 && now - failures[0] > 60000) failures.shift();
+    if (failures.length >= 10) return fail(res, 429, 'too many wrong PINs, try again in a minute');
     if (lib.checkPin(req.headers.authorization, pin)) return next();
+    // A browser's first request carries no credentials; only wrong PINs count.
+    if (req.headers.authorization) failures.push(now);
     res.set('WWW-Authenticate', 'Basic realm="Face admin"');
     fail(res, 401, 'PIN required');
   });

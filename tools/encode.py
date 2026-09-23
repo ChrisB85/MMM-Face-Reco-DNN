@@ -3,6 +3,7 @@ import face_recognition
 import pickle
 import cv2
 import os
+import sys
 from utils.image import Image
 from utils.arguments import Arguments
 
@@ -55,6 +56,11 @@ for i, imagePath in enumerate(imagePaths):
         # encodings
         knownEncodings.append(encoding)
         knownNames.append(name)
+
+# An empty model would make the mirror recognize nobody; keep the old one.
+if not knownEncodings:
+    print("[ERROR] no photo with exactly one face, model not written")
+    sys.exit(1)
 
 # dump the facial encodings + names to disk
 print("[INFO] serializing encodings...")

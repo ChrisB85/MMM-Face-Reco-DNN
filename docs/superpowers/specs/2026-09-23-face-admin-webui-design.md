@@ -81,11 +81,13 @@ stream: less code, and nothing keeps streaming when the phone screen turns off.
 
 ### Input validation (trust boundary)
 
-- Person name: `^[\p{L}\p{N}_-]{1,40}$` (Unicode letters, so Polish names work).
-  The name is also the directory name, the name in `USERS_LOGIN` and the key used in
-  `classes` of the mirror config.
-- Photo file name: `^[\p{L}\p{N}_ ()-]{1,80}\.(jpe?g|png)$` (case-insensitive), so photos
-  copied in by hand earlier stay visible and deletable. No `/`, `\` or `.` in the stem.
+- Person name: any single path segment up to 40 characters: no `/`, `\`, control
+  characters, leading dot or surrounding spaces. The name is also the directory name,
+  the name in `USERS_LOGIN` and the key used in `classes` of the mirror config.
+- Photo file name: the same segment rule up to 120 characters, ending in an extension
+  `encode.py` trains on (`jpg`, `jpeg`, `png`, `bmp`, `tif`, `tiff`, any case), so every
+  photo in the dataset is listed and deletable.
+- Ten wrong PINs within a minute return 429 to every request for the rest of that minute.
 - Every resolved path is checked to stay inside the dataset directory.
 - Anything else returns 400.
 

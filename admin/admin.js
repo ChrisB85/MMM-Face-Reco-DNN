@@ -82,7 +82,7 @@ function renderList() {
   const add = el('button', {
     textContent: 'Dodaj osobę',
     onclick: () => {
-      const name = prompt('Imię (litery, cyfry, - i _):');
+      const name = prompt('Imię:');
       if (!name) return;
       api('POST', `api/people/${enc(name)}`)
         .then(() => {

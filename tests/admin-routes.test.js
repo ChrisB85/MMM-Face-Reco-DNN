@@ -69,6 +69,16 @@ test('every route needs the PIN', async t => {
   assert.equal((await call('GET', '/api/people')).status, 200);
 });
 
+test('ten wrong PINs in a minute lock everyone out for the rest of it', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_000_000 });
+  const { call } = await setup(t);
+  assert.equal((await call('GET', '/api/people', { pin: null })).status, 401, 'no header does not count');
+  for (let i = 0; i < 10; i++) assert.equal((await call('GET', '/api/people', { pin: String(i) })).status, 401);
+  assert.equal((await call('GET', '/api/people')).status, 429, 'even the right PIN waits');
+  t.mock.timers.tick(61_000);
+  assert.equal((await call('GET', '/api/people')).status, 200);
+});
+
 test('page is served, and the bare prefix redirects to a trailing slash', async t => {
   const { call } = await setup(t);
   const bare = await call('GET', '');
