@@ -46,7 +46,8 @@ without any authentication, which would make the PIN pointless.
 The existing `dataset` and `encodings` options must point outside every directory
 MagicMirror serves, e.g. `/home/dietpi/face-reco/dataset/` and
 `/home/dietpi/face-reco/encodings.pickle`. The helper refuses to enable admin (logs an
-error) when either resolved path lies under `<MagicMirror>/modules` or `<MagicMirror>/config`.
+error) when either resolved path lies under a directory MagicMirror serves statically
+(`config`, `css`, `fonts`, `js`, `modules`, `tests`, `translations`, `vendor`).
 Migration on the mirror is a one-time `mv` plus a config change.
 
 ## Backend (`node_helper.js`)
@@ -71,9 +72,9 @@ the user name is ignored. A wrong or missing PIN returns 401 with
 | DELETE | `/api/people/:name/photos/:file` | delete a photo |
 | POST | `/api/train` | start training (409 if already running) |
 
-The page files live in `admin/`, not `public/`, and are served only through the
-authenticated routes. They contain no secrets, but keeping everything behind one
-middleware is simpler to reason about.
+The page files live in `admin/`, not `public/`. They are also reachable without the PIN
+through MagicMirror's static `/modules` route; that is fine because they hold no data or
+secrets. Every API route requires the PIN.
 
 Live preview polls `/api/frame` about twice a second instead of proxying the MJPEG
 stream: less code, and nothing keeps streaming when the phone screen turns off.
