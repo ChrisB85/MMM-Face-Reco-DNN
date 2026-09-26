@@ -231,7 +231,8 @@ Module.register('MMM-Face-Reco-DNN', {
       var currentTime = Date.now();
       var lastMessageTime = this.lastVoiceMessageTime[name] || 0;
       if (currentTime - lastMessageTime >= this.config.voiceMessageInterval) {
-        this.sendNotification('MMM-Text-To-Speech', welcomeMessage);
+        // person lets MMM-Text-To-Speech say it in the voice assigned to this user
+        this.sendNotification('MMM-Text-To-Speech', { text: welcomeMessage, person: name });
         this.lastVoiceMessageTime[name] = currentTime;
         this.config.debug && Log.log('Voice message sent for user: ' + name);
       } else {
