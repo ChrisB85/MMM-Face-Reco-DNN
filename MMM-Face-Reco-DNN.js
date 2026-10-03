@@ -92,6 +92,7 @@ Module.register('MMM-Face-Reco-DNN', {
   userClasses: [],
   image: '',
   lastVoiceMessageTime: {},
+  pendingWelcome: {},
 
   // ----------------------------------------------------------------------------------------------------
   start: function () {
@@ -220,24 +221,35 @@ Module.register('MMM-Face-Reco-DNN', {
         welcomeMessage = this.pick_greeting('knownlogin').replace('%person', personDisplayName);
       }
 
-      // Show visual notification
-      this.sendNotification('SHOW_ALERT', {
-        type: 'notification',
-        message: welcomeMessage,
-        title: this.translate('title'),
-      });
-
-      // Send voice message to TTS module only if enough time has passed for this specific user
-      var currentTime = Date.now();
-      var lastMessageTime = this.lastVoiceMessageTime[name] || 0;
-      if (currentTime - lastMessageTime >= this.config.voiceMessageInterval) {
-        // person lets MMM-Text-To-Speech say it in the voice assigned to this user
-        this.sendNotification('MMM-Text-To-Speech', { text: welcomeMessage, person: name });
-        this.lastVoiceMessageTime[name] = currentTime;
-        this.config.debug && Log.log('Voice message sent for user: ' + name);
+      if (person === this.translate('stranger')) {
+        this.speak_welcome(name, welcomeMessage);
       } else {
-        this.config.debug && Log.log('Voice message skipped for user: ' + name + ' (too soon since last message)');
+        // known person: ask the helper whether Home Assistant already greets them
+        this.pendingWelcome[name] = welcomeMessage;
+        this.sendSocketNotification('GREET', name);
       }
+    }
+  },
+
+  // Show the greeting and say it, unless this person was greeted by voice recently
+  speak_welcome: function (name, welcomeMessage) {
+    this.sendNotification('SHOW_ALERT', {
+      type: 'notification',
+      message: welcomeMessage,
+      title: this.translate('title'),
+    });
+
+    // Send voice message to TTS module only if enough time has passed for this specific user
+    var currentTime = Date.now();
+    var lastMessageTime = this.lastVoiceMessageTime[name] || 0;
+    if (currentTime - lastMessageTime >= this.config.voiceMessageInterval) {
+      // person lets MMM-Text-To-Speech say it in the voice assigned to this user
+      this.sendNotification('MMM-Text-To-Speech', { text: welcomeMessage, person: name });
+      this.lastVoiceMessageTime[name] = currentTime;
+      this.sendSocketNotification('GREETED', name);
+      this.config.debug && Log.log('Voice message sent for user: ' + name);
+    } else {
+      this.config.debug && Log.log('Voice message skipped for user: ' + name + ' (too soon since last message)');
     }
   },
 
@@ -428,6 +440,13 @@ Module.register('MMM-Face-Reco-DNN', {
   // ----------------------------------------------------------------------------------------------------
   socketNotificationReceived: function (notification, payload) {
     var self = this;
+
+    if (notification === 'GREET_DECISION') {
+      var msg = this.pendingWelcome[payload.name];
+      delete this.pendingWelcome[payload.name];
+      if (payload.speak && msg) this.speak_welcome(payload.name, msg);
+      return;
+    }
 
     if (notification === 'camera_image') {
       this.image = payload.image;

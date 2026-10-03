@@ -14,6 +14,13 @@ const { PythonShell } = require('python-shell');
 const onExit = require('signal-exit');
 const path = require('path');
 const fs = require('fs');
+const { decide } = require('./greeting');
+// mqtt is not a dependency of this module; reuse the copy MMM-Text-To-Speech ships
+const mqtt = require('../MMM-Text-To-Speech/node_modules/mqtt');
+// How long to wait for Home Assistant to confirm its greeting before the mirror greets itself
+const HA_CONFIRM_MS = 8000;
+// How long a mirror greeting counts as "already greeted" for Home Assistant
+const GREETED_S = 600;
 var pythonStarted = false;
 // Users the recognition process has logged in and not yet out; needed to log
 // them out when the process is restarted after training.
@@ -26,6 +33,73 @@ const ADMIN_DEFAULTS = {
 
 module.exports = NodeHelper.create({
   pyshell: null,
+  mqttClient: null,
+  mqttUp: false,
+  greetState: {},
+  greetWaiters: {},
+
+  // Greeting coordination with Home Assistant over MQTT. Broker and credentials come
+  // from the MMM-Text-To-Speech block of config.js. Anything wrong here (no config,
+  // broker down) leaves mqttUp false, and the mirror then greets on its own.
+  greet_start: function () {
+    let srv;
+    try {
+      const cfg = require(path.join(global.root_path, 'config', 'config.js'));
+      srv = cfg.modules.find(m => m.module === 'MMM-Text-To-Speech').config.mqttServer;
+    } catch (e) {
+      console.warn('[' + this.name + '] No MQTT config, greeting on its own: ' + e.message);
+      return;
+    }
+    const self = this;
+    const c = (this.mqttClient = mqtt.connect('mqtt://' + srv.address + ':' + srv.port, { username: srv.user, password: srv.password }));
+    c.on('connect', () => {
+      self.mqttUp = true;
+      c.subscribe('mirror/powitanie/+');
+    });
+    c.on('close', () => {
+      self.mqttUp = false;
+    });
+    c.on('error', err => console.log('[' + self.name + '] MQTT: ' + err));
+    c.on('message', (topic, payload) => {
+      const slug = topic.split('/')[2];
+      let entry;
+      try {
+        entry = JSON.parse(payload.toString());
+      } catch (e) {
+        return;
+      }
+      self.greetState[slug] = entry;
+      if (entry.stan === 'done' && self.greetWaiters[slug]) {
+        clearTimeout(self.greetWaiters[slug]);
+        delete self.greetWaiters[slug];
+        self.sendSocketNotification('GREET_DECISION', { name: self.greetNames[slug], speak: false });
+      }
+    });
+  },
+  greetNames: {},
+
+  greet_check: function (name) {
+    const slug = name.toLowerCase();
+    this.greetNames[slug] = name;
+    if (this.mqttUp) this.mqttClient.publish('mirror/face/' + slug, JSON.stringify({ ts: Math.floor(Date.now() / 1000) }));
+    const verdict = decide(this.greetState[slug], Date.now(), this.mqttUp);
+    if (verdict === 'wait') {
+      clearTimeout(this.greetWaiters[slug]);
+      this.greetWaiters[slug] = setTimeout(() => {
+        delete this.greetWaiters[slug];
+        this.sendSocketNotification('GREET_DECISION', { name, speak: true });
+      }, HA_CONFIRM_MS);
+    } else {
+      this.sendSocketNotification('GREET_DECISION', { name, speak: verdict === 'speak' });
+    }
+  },
+
+  greet_done: function (name) {
+    if (!this.mqttUp) return;
+    const payload = JSON.stringify({ stan: 'done', kto: 'lustro', do: Math.floor(Date.now() / 1000) + GREETED_S });
+    this.mqttClient.publish('mirror/powitanie/' + name.toLowerCase(), payload, { retain: true });
+  },
+
   python_start: function () {
     const self = this;
     const extendedDataset = this.config.extendDataset ? 'True' : 'False';
@@ -202,8 +276,12 @@ module.exports = NodeHelper.create({
         console.log('[' + this.name + '] Starting Python face recognition process...');
         this.python_start();
         this.admin_start();
+        this.greet_start();
       }
     }
+
+    if (notification === 'GREET') this.greet_check(payload);
+    if (notification === 'GREETED') this.greet_done(payload);
 
     // Notification for triggering face recognition received. Only send to python subprocess
     // if it has been started
