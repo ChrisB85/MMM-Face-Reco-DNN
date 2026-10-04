@@ -36,6 +36,7 @@ module.exports = NodeHelper.create({
   mqttClient: null,
   mqttUp: false,
   greetState: {},
+  askState: {},
   greetWaiters: {},
 
   // Greeting coordination with Home Assistant over MQTT. Broker and credentials come
@@ -55,6 +56,7 @@ module.exports = NodeHelper.create({
     c.on('connect', () => {
       self.mqttUp = true;
       c.subscribe('mirror/powitanie/+');
+      c.subscribe('mirror/pytanie/+');
     });
     c.on('close', () => {
       self.mqttUp = false;
@@ -66,6 +68,10 @@ module.exports = NodeHelper.create({
       try {
         entry = JSON.parse(payload.toString());
       } catch (e) {
+        return;
+      }
+      if (topic.split('/')[1] === 'pytanie') {
+        self.askState[slug] = entry;
         return;
       }
       self.greetState[slug] = entry;
@@ -82,7 +88,7 @@ module.exports = NodeHelper.create({
     const slug = name.toLowerCase();
     this.greetNames[slug] = name;
     if (this.mqttUp) this.mqttClient.publish('mirror/face/' + slug, JSON.stringify({ ts: Math.floor(Date.now() / 1000) }));
-    const verdict = decide(this.greetState[slug], Date.now(), this.mqttUp);
+    const verdict = decide(this.greetState[slug], Date.now(), this.mqttUp, this.askState[slug]);
     if (verdict === 'wait') {
       clearTimeout(this.greetWaiters[slug]);
       this.greetWaiters[slug] = setTimeout(() => {
