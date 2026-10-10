@@ -95,6 +95,12 @@ Module.register('MMM-Face-Reco-DNN', {
   image: '',
   lastVoiceMessageTime: {},
   pendingWelcome: {},
+  // Voice assistant conversation running: MMM-Sounds drops every sound then
+  voiceBusy: false,
+  // Greetings held back by a conversation, said when it ends if the person is still here
+  deferredWelcome: {},
+  // Greetings sent to TTS whose sound has not started yet
+  awaitingSound: {},
 
   // ----------------------------------------------------------------------------------------------------
   start: function () {
@@ -241,14 +247,19 @@ Module.register('MMM-Face-Reco-DNN', {
       title: this.translate('title'),
     });
 
+    if (this.voiceBusy) {
+      this.deferredWelcome[name] = welcomeMessage;
+      return;
+    }
+
     // Send voice message to TTS module only if enough time has passed for this specific user
     var currentTime = Date.now();
     var lastMessageTime = this.lastVoiceMessageTime[name] || 0;
     if (currentTime - lastMessageTime >= this.config.voiceMessageInterval) {
-      // person lets MMM-Text-To-Speech say it in the voice assigned to this user
+      // person lets MMM-Text-To-Speech say it in the voice assigned to this user;
+      // it counts as greeted (GREETED) only once the sound starts (SOUND_STARTED)
       this.sendNotification('MMM-Text-To-Speech', { text: welcomeMessage, person: name });
-      this.lastVoiceMessageTime[name] = currentTime;
-      this.sendSocketNotification('GREETED', name);
+      this.awaitingSound[name] = welcomeMessage;
       this.config.debug && Log.log('Voice message sent for user: ' + name);
     } else {
       this.config.debug && Log.log('Voice message skipped for user: ' + name + ' (too soon since last message)');
@@ -525,6 +536,33 @@ Module.register('MMM-Face-Reco-DNN', {
 
   // ----------------------------------------------------------------------------------------------------
   notificationReceived: function (notification, payload, _sender) {
+    if (notification === 'VOICE_ASSISTANT_STATE') {
+      var busy = payload !== 'idle';
+      if (busy) {
+        // a greeting still downloading would be dropped by MMM-Sounds, say it after the conversation
+        Object.assign(this.deferredWelcome, this.awaitingSound);
+        this.awaitingSound = {};
+      }
+      var ended = this.voiceBusy && !busy;
+      this.voiceBusy = busy;
+      if (ended) {
+        var deferred = this.deferredWelcome;
+        this.deferredWelcome = {};
+        for (var who in deferred) {
+          if (this.users.indexOf(who) !== -1) this.speak_welcome(who, deferred[who]);
+        }
+      }
+    }
+
+    // ponytail: any sound start confirms pending greetings; match the TTS file if other sounds overlap greetings
+    if (notification === 'SOUND_STARTED') {
+      for (var person in this.awaitingSound) {
+        this.lastVoiceMessageTime[person] = Date.now();
+        this.sendSocketNotification('GREETED', person);
+      }
+      this.awaitingSound = {};
+    }
+
     // Event if DOM is created
     if (notification === 'DOM_OBJECTS_CREATED') {
       // at startup modules will already be shown
