@@ -61,6 +61,8 @@ Module.register('MMM-Face-Reco-DNN', {
     dataset: 'modules/MMM-Face-Reco-DNN/dataset/',
     // How much distance between faces to consider it a match. Lower is more strict.
     tolerance: 0.6,
+    // Consecutive frames a name must appear in before the user logs in (1 = first frame)
+    minFrames: 1,
     // allow multiple concurrent user logins, 0=no, any other number is the maximum number of concurrent logins
     multiUser: 0,
     // resoltuion of the image

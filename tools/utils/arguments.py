@@ -119,6 +119,13 @@ class Arguments:
             help="How much distance between faces to consider it a match. Lower is more strict.",
         )
         ap.add_argument(
+            "--minFrames",
+            type=int,
+            required=False,
+            default=1,
+            help="consecutive frames a name must appear in before it logs in",
+        )
+        ap.add_argument(
             "-br",
             "--brightness",
             default=0,

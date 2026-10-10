@@ -16,6 +16,7 @@ from datetime import datetime
 from utils.image import Image
 from utils.arguments import Arguments
 from utils.print import Print
+from utils.confirm import NameConfirmer
 from utils.mjpg_stream import MjpgStreamCapture
 
 def signalHandler(signal, frame):
@@ -111,6 +112,7 @@ if Arguments.get("extendDataset") is True:
         os.mkdir(unknownPath)
 
 tolerance = float(Arguments.get("tolerance"))
+confirmer = NameConfirmer(Arguments.get("minFrames"))
 
 # Default to running face recognition
 run_face_recognition = True
@@ -253,6 +255,8 @@ while True:
 
         # update the FPS counter
         # fps.update()
+
+        names = confirmer.update(names)
 
         logins = []
         logouts = []

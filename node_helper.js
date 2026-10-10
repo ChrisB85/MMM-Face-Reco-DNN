@@ -135,6 +135,7 @@ module.exports = NodeHelper.create({
         '--extendDataset=' + extendedDataset,
         '--dataset=' + this.config.dataset,
         '--tolerance=' + this.config.tolerance,
+        '--minFrames=' + this.config.minFrames,
         '--brightness=' + this.config.brightness,
         '--contrast=' + this.config.contrast,
         '--resolution=' + this.config.resolution.join(','),
