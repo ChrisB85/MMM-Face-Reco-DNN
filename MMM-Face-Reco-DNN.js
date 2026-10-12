@@ -99,6 +99,8 @@ Module.register('MMM-Face-Reco-DNN', {
   voiceBusy: false,
   // Greetings held back by a conversation, said when it ends if the person is still here
   deferredWelcome: {},
+  // The current busy period of the voice assistant includes a conversation (not only an announcement)
+  conversation: false,
   // Greetings sent to TTS whose sound has not started yet
   awaitingSound: {},
 
@@ -539,17 +541,27 @@ Module.register('MMM-Face-Reco-DNN', {
     if (notification === 'VOICE_ASSISTANT_STATE') {
       var busy = payload !== 'idle';
       if (busy) {
-        // a greeting still downloading would be dropped by MMM-Sounds, say it after the conversation
+        // a greeting still downloading would be dropped by MMM-Sounds, decide about it when the assistant is idle again
         Object.assign(this.deferredWelcome, this.awaitingSound);
         this.awaitingSound = {};
       }
+      // wake/listening = someone talks to the assistant; speaking alone is an announcement from Home Assistant
+      var talked = this.conversation;
+      this.conversation = busy && (this.conversation || payload === 'wake' || payload === 'listening');
       var ended = this.voiceBusy && !busy;
       this.voiceBusy = busy;
       if (ended) {
         var deferred = this.deferredWelcome;
         this.deferredWelcome = {};
         for (var who in deferred) {
-          if (this.users.indexOf(who) !== -1) this.speak_welcome(who, deferred[who]);
+          if (this.users.indexOf(who) === -1) continue;
+          if (talked) {
+            // ponytail: whoever stood in front of the mirror during a conversation took part in it; a greeting after it sounds absurd (2026-10-12)
+            this.lastVoiceMessageTime[who] = Date.now();
+            this.sendSocketNotification('GREETED', who);
+          } else {
+            this.speak_welcome(who, deferred[who]);
+          }
         }
       }
     }
