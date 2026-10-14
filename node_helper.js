@@ -14,7 +14,7 @@ const { PythonShell } = require('python-shell');
 const onExit = require('signal-exit');
 const path = require('path');
 const fs = require('fs');
-const { decide } = require('./greeting');
+const { decide, greetMqttServer } = require('./greeting');
 // mqtt is not a dependency of this module; reuse the copy MMM-Text-To-Speech ships
 const mqtt = require('../MMM-Text-To-Speech/node_modules/mqtt');
 // How long to wait for Home Assistant to confirm its greeting before the mirror greets itself
@@ -40,13 +40,12 @@ module.exports = NodeHelper.create({
   greetWaiters: {},
 
   // Greeting coordination with Home Assistant over MQTT. Broker and credentials come
-  // from the MMM-Text-To-Speech block of config.js. Anything wrong here (no config,
+  // from the MMM-Text-To-Speech block of the loaded config. Anything wrong here (no config,
   // broker down) leaves mqttUp false, and the mirror then greets on its own.
   greet_start: function () {
     let srv;
     try {
-      const cfg = require(path.join(global.root_path, 'config', 'config.js'));
-      srv = cfg.modules.find(m => m.module === 'MMM-Text-To-Speech').config.mqttServer;
+      srv = greetMqttServer(global.config, () => require(path.join(global.root_path, 'config', 'config.js')));
     } catch (e) {
       console.warn('[' + this.name + '] No MQTT config, greeting on its own: ' + e.message);
       return;

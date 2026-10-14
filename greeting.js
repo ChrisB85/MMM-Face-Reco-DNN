@@ -16,4 +16,12 @@ function decide(entry, nowMs, connected, ask) {
   return ask && ask.due === true && ask.do * 1000 > nowMs ? 'wait' : 'speak';
 }
 
-module.exports = { decide };
+// Broker and credentials of the MMM-Text-To-Speech block. MagicMirror 2.35+ keeps the
+// config with SECRET_ values resolved in global.config; config.js on disk only holds
+// the ${SECRET_...} placeholders, so it is the fallback for older versions.
+function greetMqttServer(loadedConfig, readConfigFile) {
+  const cfg = loadedConfig || readConfigFile();
+  return cfg.modules.find(m => m.module === 'MMM-Text-To-Speech').config.mqttServer;
+}
+
+module.exports = { decide, greetMqttServer };
